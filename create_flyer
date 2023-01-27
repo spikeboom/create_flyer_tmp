@@ -1,0 +1,597 @@
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.CreateFlyerService = void 0;
+
+var _polotnoNode = require("polotno-node");
+
+var _S3StorageProvider = _interopRequireDefault(require("../../../shared/container/providers/implementations/S3StorageProvider"));
+
+var _axios = _interopRequireDefault(require("axios"));
+
+var _sharp = _interopRequireDefault(require("sharp"));
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+Number.prototype.pad = function (size) {
+  var s = String(this);
+
+  while (s.length < (size || 2)) {
+    s = '0' + s;
+  }
+
+  return s;
+};
+
+class CreateFlyerService {
+  async execute({
+    templateId,
+    templateName,
+    offer_id,
+    tagId,
+    tagURL,
+    products,
+    designURL,
+    backgroundURL,
+    company_data,
+    auxiliar_texts,
+    auxiliar_texts_colors,
+    colors,
+    dynamics,
+    isBase64,
+    pixelRatio,
+    isPNG,
+    byGoogleCloud
+  }) {
+    try {
+      const storage = new _S3StorageProvider.default();
+      const instance = await (0, _polotnoNode.createInstance)({
+        key: 'yZmSqFIdIOq97fh6E_Lk'
+      }); // console.log({ backgroundURL });
+
+      let productQuantity = null;
+      let json;
+      var url = designURL;
+      await (0, _axios.default)({
+        url: url,
+        method: 'GET',
+        responseType: 'json'
+      }).then(response => {
+        // console.log(response.data);
+        json = response.data;
+      }).catch(err => {
+        console.log(err);
+        return err;
+      }); // console.log({ tagURL });
+
+      let price1 = 'price';
+      let price2 = 'club_price';
+      products = products.map(product => {
+        let preco_por_reais = '00';
+
+        if (product[price2]) {
+          preco_por_reais = Math.trunc(product[price2]).toString();
+        }
+
+        let preco_por_centavos = ',00';
+
+        if (product[price2]) {
+          preco_por_centavos = ',' + (product[price2] % 1).toFixed(2).substring(2);
+        }
+
+        let preco_de_reais = '00';
+
+        if (product[price1]) {
+          preco_de_reais = Math.trunc(product[price1]).toString();
+        }
+
+        let preco_de_centavos = ',00';
+
+        if (product[price1]) {
+          preco_de_centavos = ',' + (product[price1] % 1).toFixed(2).substring(2);
+        }
+
+        const dinamica_comercial_array = pre_price => {
+          var _product;
+
+          let string_aux = '';
+
+          switch ((_product = product) === null || _product === void 0 ? void 0 : _product.dynamics) {
+            case 'preco_unico':
+              string_aux = 'DE: ' + pre_price + '\n' + 'POR:';
+              break;
+
+            case 'de_por':
+              string_aux = 'DE: ' + pre_price + '\n' + 'POR:';
+              break;
+
+            case 'varejo_atacado':
+              string_aux = 'VAREJO: ' + pre_price + '\n' + 'ATACADO:';
+              break;
+
+            case 'pack_unitario':
+              string_aux = 'PACK: ' + pre_price + '\n' + 'UNITÁRIO:';
+              break;
+
+            default:
+              string_aux = 'DE: ' + pre_price + '\n' + 'POR:';
+          }
+
+          return string_aux;
+        };
+
+        let preco_1 = '';
+
+        if (product[price1]) {
+          preco_1 = product[price1].toFixed(2).replace('.', ',');
+          preco_1 = dinamica_comercial_array(preco_1);
+        }
+
+        let preco_2 = '00,00';
+
+        if (product[price2]) {
+          preco_2 = product[price2].toFixed(2).replace('.', ',');
+        }
+
+        try {
+          if (product.isOfertaSecreta) {
+            product = { ...product,
+              image_url: 'https://datasalesio-imagens.s3.amazonaws.com/ofertasecreta_default_image.png',
+              name: 'Veja no link'
+            };
+          }
+        } catch (err) {}
+
+        return { ...product,
+          [price1]: preco_1,
+          [price2]: preco_2,
+          preco_por_reais,
+          preco_por_centavos,
+          preco_de_reais,
+          preco_de_centavos,
+          etiqueta: tagURL ? tagURL : null
+        };
+      });
+      let outArray = [];
+      let finalJsonCopy;
+      let actualProduct = 0;
+      let i_page = 0;
+      let morePage = 1;
+      let max_paginas_por_requisicao = 10;
+
+      while (morePage === 1 && i_page < max_paginas_por_requisicao) {
+        console.log(i_page, '...');
+        i_page++;
+        finalJsonCopy = { // ...finalJson,
+          ...json,
+          fonts: [{
+            fontFamily: 'Barlow-ExtraBold',
+            url: 'https://datasalesio-imagens.s3.amazonaws.com/tmp-jhgs/Barlow-ExtraBold.ttf'
+          }, {
+            fontFamily: 'BwSurco-Black',
+            url: 'https://datasalesio-imagens.s3.amazonaws.com/tmp-jhgs/fonts/BwSurcoDEMO-Black.otf'
+          }, {
+            fontFamily: 'BwSurco-Bold',
+            url: 'https://datasalesio-imagens.s3.amazonaws.com/tmp-jhgs/fonts/BwSurcoDEMO-Bold.otf'
+          }, {
+            fontFamily: 'BwSurco-MediumItalic',
+            url: 'https://datasalesio-imagens.s3.amazonaws.com/tmp-jhgs/fonts/BwSurcoDEMO-MediumItalic.otf'
+          }, {
+            fontFamily: 'AmsiProCond-Black',
+            url: 'https://datasalesio-imagens.s3.amazonaws.com/tmp-jhgs/fontes-gustavo/AmsiProCond-Black.otf'
+          }, {
+            fontFamily: 'AmsiProCond-Bold',
+            url: 'https://datasalesio-imagens.s3.amazonaws.com/tmp-jhgs/fontes-gustavo/AmsiProCond-Bold.otf'
+          }, {
+            fontFamily: 'AmsiProCond-Regular',
+            url: 'https://datasalesio-imagens.s3.amazonaws.com/tmp-jhgs/fontes-gustavo/AmsiProCond-Regular.otf'
+          }, {
+            fontFamily: 'AmsiProCond-SemiBold',
+            url: 'https://datasalesio-imagens.s3.amazonaws.com/tmp-jhgs/fontes-gustavo/AmsiProCond-SemiBold.otf'
+          }, {
+            fontFamily: 'Berlin+Sans+FB+Demi+Negrito',
+            url: 'https://datasalesio-imagens.s3.amazonaws.com/tmp-jhgs/fontes-gustavo/Berlin+Sans+FB+Demi+Negrito.TTF'
+          }, {
+            fontFamily: 'Berlin+Sans+FB+Negrito',
+            url: 'https://datasalesio-imagens.s3.amazonaws.com/tmp-jhgs/fontes-gustavo/Berlin+Sans+FB+Negrito.TTF'
+          }, {
+            fontFamily: 'Berlin+Sans+FB',
+            url: 'https://datasalesio-imagens.s3.amazonaws.com/tmp-jhgs/fontes-gustavo/Berlin+Sans+FB.TTF'
+          }, {
+            fontFamily: 'chinese+rocks+rg',
+            url: 'https://datasalesio-imagens.s3.amazonaws.com/tmp-jhgs/fontes-gustavo/chinese+rocks+rg.otf'
+          }, {
+            fontFamily: 'Eveleth+Dot+W01+Light',
+            url: 'https://datasalesio-imagens.s3.amazonaws.com/tmp-jhgs/fontes-gustavo/Eveleth+Dot+W01+Light.otf'
+          }, {
+            fontFamily: 'Eveleth+W01+Bold',
+            url: 'https://datasalesio-imagens.s3.amazonaws.com/tmp-jhgs/fontes-gustavo/Eveleth+W01+Bold.otf'
+          }, {
+            fontFamily: 'Eveleth+W01+Regular',
+            url: 'https://datasalesio-imagens.s3.amazonaws.com/tmp-jhgs/fontes-gustavo/Eveleth+W01+Regular.otf'
+          }, {
+            fontFamily: 'Eveleth+W01+Thin',
+            url: 'https://datasalesio-imagens.s3.amazonaws.com/tmp-jhgs/fontes-gustavo/Eveleth+W01+Thin.otf'
+          }, //
+          //
+          {
+            fontFamily: 'MadeTommy-Black',
+            url: 'https://datasalesio-imagens.s3.amazonaws.com/tmp-jhgs/fonts/new_big_client/MADE+TOMMY+Black_PERSONAL+USE.otf'
+          }, {
+            fontFamily: 'MadeTommy-Bold',
+            url: 'https://datasalesio-imagens.s3.amazonaws.com/tmp-jhgs/fonts/new_big_client/MADE+TOMMY+Bold_PERSONAL+USE.otf'
+          }, {
+            fontFamily: 'MadeTommy-ExtraBold',
+            url: 'https://datasalesio-imagens.s3.amazonaws.com/tmp-jhgs/fonts/new_big_client/MADE+TOMMY+ExtraBold_PERSONAL+USE.otf'
+          }, {
+            fontFamily: 'MadeTommy-Light',
+            url: 'https://datasalesio-imagens.s3.amazonaws.com/tmp-jhgs/fonts/new_big_client/MADE+TOMMY+Light_PERSONAL+USE.otf'
+          }, {
+            fontFamily: 'MadeTommy-Medium',
+            url: 'https://datasalesio-imagens.s3.amazonaws.com/tmp-jhgs/fonts/new_big_client/MADE+TOMMY+Medium_PERSONAL+USE.otf'
+          }, {
+            fontFamily: 'MadeTommy-Regular',
+            url: 'https://datasalesio-imagens.s3.amazonaws.com/tmp-jhgs/fonts/new_big_client/MADE+TOMMY+Regular_PERSONAL+USE.otf'
+          }, {
+            fontFamily: 'MadeTommy-Thin',
+            url: 'https://datasalesio-imagens.s3.amazonaws.com/tmp-jhgs/fonts/new_big_client/MADE+TOMMY+Thin_PERSONAL+USE.otf'
+          }],
+          pages: [{ ...json.pages[0],
+            children: [],
+            background: backgroundURL ? backgroundURL : json.pages[0] && json.pages[0].background ? json.pages[0].background : ' '
+          }]
+        }; // console.log({ colors });
+
+        let colorText = colors !== null && colors !== void 0 && colors.colorText ? 'rgba(' + (colors === null || colors === void 0 ? void 0 : colors.colorText.r) + ',' + (colors === null || colors === void 0 ? void 0 : colors.colorText.g) + ',' + (colors === null || colors === void 0 ? void 0 : colors.colorText.b) + ',' + (colors === null || colors === void 0 ? void 0 : colors.colorText.a) + ')' : null;
+        let colorPrice = colors !== null && colors !== void 0 && colors.colorPrice ? 'rgba(' + (colors === null || colors === void 0 ? void 0 : colors.colorPrice.r) + ',' + (colors === null || colors === void 0 ? void 0 : colors.colorPrice.g) + ',' + (colors === null || colors === void 0 ? void 0 : colors.colorPrice.b) + ',' + (colors === null || colors === void 0 ? void 0 : colors.colorPrice.a) + ')' : null;
+        let objColorsAuxiliarTexts = {};
+
+        for (const propertie in auxiliar_texts_colors) {
+          let tmpRGAB = auxiliar_texts_colors[propertie];
+          let tmpColor = tmpRGAB ? 'rgba(' + (tmpRGAB === null || tmpRGAB === void 0 ? void 0 : tmpRGAB.r) + ',' + (tmpRGAB === null || tmpRGAB === void 0 ? void 0 : tmpRGAB.g) + ',' + (tmpRGAB === null || tmpRGAB === void 0 ? void 0 : tmpRGAB.b) + ',' + (tmpRGAB === null || tmpRGAB === void 0 ? void 0 : tmpRGAB.a) + ')' : null;
+          objColorsAuxiliarTexts[propertie] = tmpColor;
+        }
+
+        colorText = colorText ? {
+          fill: colorText
+        } : null;
+        colorPrice = colorPrice ? {
+          fill: colorPrice
+        } : null;
+        let objColorsAuxiliarTextsFinal = {};
+
+        for (const propertie in objColorsAuxiliarTexts) {
+          objColorsAuxiliarTextsFinal[propertie] = objColorsAuxiliarTexts[propertie] ? {
+            fill: objColorsAuxiliarTexts[propertie]
+          } : null;
+        } // console.log({ colorText, colorPrice });
+
+
+        let modelo = [['produto-imagem-', 'image_url', 'src'], ['etiqueta-', 'etiqueta', 'src'], ['produto-nome-', 'name', 'text', colorText], ['produto-descricao-', 'name', 'text', colorText], ['produto-preco-de-', price1, 'text', colorPrice], ['produto-preco-1-', price1, 'text', colorPrice], ['produto-preco-de-reais-', 'preco_de_reais', 'text', colorPrice], ['produto-preco-de-centavos-', 'preco_de_centavos', 'text', colorPrice], ['produto-preco-1-reais-', 'preco_de_reais', 'text', colorPrice], ['produto-preco-1-centavos-', 'preco_de_centavos', 'text', colorPrice], ['produto-preco-de-r-', 'preco_de_reais', 'text', colorPrice], ['produto-preco-de-c-', 'preco_de_centavos', 'text', colorPrice], ['produto-preco-por-', price2, 'text', colorPrice], ['produto-preco-2-', price2, 'text', colorPrice], ['produto-preco-por-reais-', 'preco_por_reais', 'text', colorPrice], ['produto-preco-por-centavos-', 'preco_por_centavos', 'text', colorPrice], ['produto-preco-2-reais-', 'preco_por_reais', 'text', colorPrice], ['produto-preco-2-centavos-', 'preco_por_centavos', 'text', colorPrice], ['produto-preco-por-r-', 'preco_por_reais', 'text', colorPrice], ['produto-preco-por-c-', 'preco_por_centavos', 'text', colorPrice], ['preco-um-', price1, 'text', colorPrice], ['preco-dois-', price2, 'text', colorPrice], //
+        ['var1-', 'var1', 'text', colorText], ['var2-', 'var2', 'text', colorText], ['var3-', 'var3', 'text', colorText], ['var4-', 'var4', 'text', colorText], ['var5-', 'var5', 'text', colorText], ['var6-', 'var6', 'text', colorText]];
+
+        function compare(a, b) {
+          if (a < b) {
+            return -1;
+          }
+
+          if (a > b) {
+            return 1;
+          }
+
+          return 0;
+        }
+
+        let j_variable = 1;
+        let _continue = 1;
+
+        while (_continue === 1 && j_variable < 333) {
+          // < 333 por segurança evitando muitos loops
+          // j = qtde de produtos por pagina
+          let indexProduct = j_variable - 1 + actualProduct;
+
+          if (products[indexProduct]) {
+            let tmpChildren = [];
+
+            for (let elemento of modelo) {
+              tmpChildren = [...tmpChildren, ...json.pages[0].children.filter(child => {
+                var _child$custom;
+
+                return ((_child$custom = child.custom) === null || _child$custom === void 0 ? void 0 : _child$custom.name) === elemento[0] + j_variable.pad(2);
+              }).sort((a, b) => compare(a.custom.name, b.custom.name)) // para q fique na ordem 01 ... 02 ... 03
+              .map(child => {
+                var _elemento$, _elemento$2;
+
+                let color = {};
+
+                if (elemento[3]) {
+                  color = elemento[3];
+                } // PARA ETIQUETAS NAO SAIREM CORTADAS
+
+
+                let tmp_etiqueta = {};
+
+                if (elemento[1] === 'etiqueta') {
+                  tmp_etiqueta.width = child.width / child.cropWidth;
+                  tmp_etiqueta.height = child.height / child.cropHeight;
+                  tmp_etiqueta.cropWidth = 1;
+                  tmp_etiqueta.cropHeight = 1;
+                }
+
+                if (!products[indexProduct][elemento[1]] && ((_elemento$ = elemento[0]) !== null && _elemento$ !== void 0 && _elemento$.includes('produto-imagem') || (_elemento$2 = elemento[0]) !== null && _elemento$2 !== void 0 && _elemento$2.includes('preco'))) {
+                  return {};
+                }
+
+                return { ...child,
+                  ...color,
+                  ...tmp_etiqueta,
+                  [elemento[2]]: products[indexProduct] && products[indexProduct][elemento[1]] ? [elemento[2]] === 'src' ? products[indexProduct][elemento[1]].toString().split('?')[0] : products[indexProduct][elemento[1]].toString() : child[elemento[2]]
+                };
+              }).map(child => {
+                return child;
+              })];
+            }
+
+            if (tmpChildren.length > 0) {
+              finalJsonCopy.pages[0].children = [...finalJsonCopy.pages[0].children, ...tmpChildren];
+            } else {
+              _continue = 0;
+            }
+
+            j_variable++;
+          } else {
+            _continue = 0;
+            j_variable--;
+          }
+
+          if (i_page === 1) {
+            productQuantity = indexProduct; // console.log({ productQuantity });
+          }
+        } // aqui executa se ainda tiver products ou se nao tiver products e for o primeiro
+        // para caso de modelo pronto (sem produtos)
+
+
+        if (!(finalJsonCopy.pages[0].children.length === 0 && i_page !== 1)) {
+          var _json, _json$pages$, _json$pages$$children;
+
+          actualProduct += productQuantity; //-----------------------------------------------------
+
+          let extras = [['logo', 'logo_url', 'src'], ['description', 'description', 'text', colorText], ['address', 'address', 'text', colorText], ['phone-number', 'phone_number', 'text', colorText], ['descricao', 'description', 'text', colorText], ['endereco', 'address', 'text', colorText], ['telefone', 'phone_number', 'text', colorText], //
+          ['logo-empresa-01', 'logo_url', 'src'], ['descritivo-texto-001', 'description', 'text', colorText], ['endereco-01', 'phone_number', 'text', colorText], ['endereco-02', 'address', 'text', colorText], ...Object.keys(auxiliar_texts || {}).map((item_at, index_at) => [item_at, item_at, 'text', objColorsAuxiliarTextsFinal[item_at] || null])]; //PREENCHE COM OUTROS ELEMENTOS ALEATORIOS
+          // let children = json.pages[0].children;
+          // for (let child of children) {
+          //   const aux1 = modelo.findIndex(m =>
+          //     child?.custom?.name?.startsWith(m[0]),
+          //   );
+          //   const aux2 = extras.findIndex(e =>
+          //     child?.custom?.name?.startsWith(e[0]),
+          //   );
+          //   if (aux1 < 0 && aux2 < 0) {
+          //     finalJsonCopy.pages[0].children.push(child);
+          //   }
+          // }
+          // coloca extra depois de Elementos Aleatorios pra poder ficar por cima
+          // z index
+
+          const extra_data = { ...company_data,
+            ...auxiliar_texts
+          };
+
+          for (let extra of extras) {
+            finalJsonCopy.pages[0].children = [...finalJsonCopy.pages[0].children, ...json.pages[0].children.filter(child => {
+              var _child$custom2, _extra$;
+
+              return ((_child$custom2 = child.custom) === null || _child$custom2 === void 0 ? void 0 : _child$custom2.name) === extra[0] && (!!extra_data[extra[1]] || (extra === null || extra === void 0 ? void 0 : (_extra$ = extra[1]) === null || _extra$ === void 0 ? void 0 : _extra$.includes('texto-auxiliar')));
+            }).map(child => {
+              let color = {};
+
+              if (extra[3]) {
+                color = extra[3];
+              } // PARA LOGOS NAO SAIREM CORTADOS - AJUSTADOS
+
+
+              let tmp_logo = {};
+
+              if (extra[0] === 'logo') {
+                // console.log({ ...child, src: null });
+                tmp_logo.width = child.height; // tmp_logo.height = child.height;
+
+                tmp_logo.x = child.x + (child.width - child.height) / 2;
+                tmp_logo.cropWidth = 1;
+                tmp_logo.cropHeight = 1; // console.log({ tmp_logo });
+              }
+
+              return { ...child,
+                ...color,
+                ...tmp_logo,
+                [extra[2]]: extra_data && extra_data[extra[1]] ? extra[2] === 'src' ? extra_data[extra[1]].toString().split('?')[0] : extra_data[extra[1]].toString() : child[extra[2]]
+              };
+            })];
+          } //-----------------------------------------------------
+          //-----------------------------------------------------
+
+
+          let finalJsonCopy_reorder = { ...finalJsonCopy,
+            pages: [{ ...finalJsonCopy.pages[0],
+              children: []
+            }]
+          };
+
+          if (((_json = json) === null || _json === void 0 ? void 0 : (_json$pages$ = _json.pages[0]) === null || _json$pages$ === void 0 ? void 0 : (_json$pages$$children = _json$pages$.children) === null || _json$pages$$children === void 0 ? void 0 : _json$pages$$children.length) > 0) {
+            for (let json_count = 0; json_count < json.pages[0].children.length; json_count++) {
+              let element_k = json.pages[0].children[json_count];
+              const aux1 = finalJsonCopy.pages[0].children.findIndex(child => {
+                var _child$custom3, _element_k$custom, _child$custom4, _element_k$custom2;
+
+                return (child === null || child === void 0 ? void 0 : (_child$custom3 = child.custom) === null || _child$custom3 === void 0 ? void 0 : _child$custom3.name) && (element_k === null || element_k === void 0 ? void 0 : (_element_k$custom = element_k.custom) === null || _element_k$custom === void 0 ? void 0 : _element_k$custom.name) && (child === null || child === void 0 ? void 0 : (_child$custom4 = child.custom) === null || _child$custom4 === void 0 ? void 0 : _child$custom4.name) === (element_k === null || element_k === void 0 ? void 0 : (_element_k$custom2 = element_k.custom) === null || _element_k$custom2 === void 0 ? void 0 : _element_k$custom2.name);
+              });
+              const aux2 = modelo.findIndex(m => {
+                var _element_k$custom3, _element_k$custom3$na;
+
+                return element_k === null || element_k === void 0 ? void 0 : (_element_k$custom3 = element_k.custom) === null || _element_k$custom3 === void 0 ? void 0 : (_element_k$custom3$na = _element_k$custom3.name) === null || _element_k$custom3$na === void 0 ? void 0 : _element_k$custom3$na.startsWith(m[0]);
+              });
+              const aux3 = extras.findIndex(e => {
+                var _element_k$custom4, _element_k$custom4$na;
+
+                return element_k === null || element_k === void 0 ? void 0 : (_element_k$custom4 = element_k.custom) === null || _element_k$custom4 === void 0 ? void 0 : (_element_k$custom4$na = _element_k$custom4.name) === null || _element_k$custom4$na === void 0 ? void 0 : _element_k$custom4$na.startsWith(e[0]);
+              });
+              let aux_0 = aux1 >= 0 && (aux2 >= 0 || aux3 >= 0) ? finalJsonCopy.pages[0].children[aux1] : aux2 < 0 && aux3 < 0 ? element_k : null;
+
+              if (aux_0) {
+                finalJsonCopy_reorder = { ...finalJsonCopy_reorder,
+                  pages: [{ ...finalJsonCopy_reorder.pages[0],
+                    children: [...finalJsonCopy_reorder.pages[0].children, aux_0]
+                  }]
+                };
+              }
+            }
+          }
+
+          finalJsonCopy = finalJsonCopy_reorder; //-----------------------------------------------------
+          // console.log({ pixelRatio }, !!pixelRatio);
+
+          const fileImage = await instance.jsonToImageBase64(finalJsonCopy, {
+            pixelRatio: pixelRatio ? pixelRatio : isBase64 ? 0.4 : 1,
+            ...(!isPNG ? {
+              mimeType: 'image/jpeg'
+            } : {})
+          });
+          const typeFileImageParam = isPNG ? 'png' : 'jpeg'; // if (isBase64 === 'json') {
+          //   return { fileImage };
+          // }
+
+          if (isBase64 === 'html') {
+            return `<img src="data:image/${typeFileImageParam};base64,` + fileImage + '" />';
+          }
+
+          if (isBase64 === 'justTest') {
+            return null;
+          }
+
+          if (!isBase64) {
+            const base64Data = fileImage.replace(!isPNG ? /^data:image\/jpeg;base64,/ : /^data:image\/png;base64,/, '');
+            const timestamps = new Date().toISOString();
+            let name = 'generate';
+            let design_url = await storage.saveFile({
+              name: `${offer_id}-${name}-${timestamps}`,
+              type: 'json',
+              contentType: 'application/json',
+              base64: Buffer.from(JSON.stringify(finalJsonCopy, undefined, 2)).toString('base64')
+            }, {
+              byGoogleCloud
+            });
+            let image_url = await storage.saveFile({
+              name: `${offer_id}-${name}-${timestamps}`,
+              type: typeFileImageParam,
+              contentType: 'image/' + typeFileImageParam,
+              base64: base64Data
+            }, {
+              byGoogleCloud
+            });
+            const thumbnailB64 = Buffer.from(fileImage, 'base64');
+            let thumbnail = await (0, _sharp.default)(thumbnailB64).resize(350).jpeg().toBuffer().then(data => {
+              return Buffer.from(data, 'binary').toString('base64');
+            }).catch(err => {
+              console.log(err);
+            });
+            thumbnail = await storage.saveFile({
+              name: `${offer_id}-${name}-thumbnail-${timestamps}`,
+              url: null,
+              type: 'jpeg',
+              contentType: 'image/jpeg',
+              base64: thumbnail
+            }, {
+              byGoogleCloud
+            });
+            outArray.push({
+              page: i_page,
+              image_url,
+              design_url,
+              preview_url: thumbnail
+            });
+          } else {
+            outArray.push({
+              page: i_page,
+              image_url: fileImage
+            });
+          }
+        }
+
+        if (finalJsonCopy.pages[0].children.length === 0) {
+          morePage = 0;
+        }
+      }
+
+      instance.close();
+      console.log('...end...');
+      return {
+        message: 'fim',
+        outArray
+      };
+    } catch (err) {
+      console.log('ERROR create flyer ------------------------------------------------------------------------------------');
+      console.log('---->', err);
+      await _axios.default.post(`https://graph.workplace.com/group/feed`, {
+        message: JSON.stringify({
+          tipo_de_erro: 'CREATE',
+          templateId,
+          templateName,
+          offer_id,
+          tagId,
+          tagURL,
+          products,
+          designURL,
+          backgroundURL,
+          company_data,
+          colors,
+          err: err.toString(),
+          path: 'erro_flyer_create',
+          part_name_file: '---'
+        }, null, 4),
+        access_token: 'DQVJzS0NydFc2QlVQYTNiWTZARQ1o0UjlXUEEtTDBjZA25ZAMmEzSkhlTll0Vm1ZAdVo4NTNjREZAmXzFwVHBKNWYyM0JLS1NQQThtZATZAtTlJ0X3A2S2Roc1FmYmtfcUNHLVJVd3RIYXM2bmttUEdmS1k3WTBJdmo5azNfUHRKRDQ5TTZAnMDdzMDdxSWhJNWJjVXhxSEYtdkVMZAG9XX3FNODFXbnFFSnh0cHY1ODZAZARk4zNWNvQlRwYko4bTVTOVJFX2FZAR0h5ZAUFB'
+      }).then(resp => console.log('--- enviou erro (create)')).catch(err => {
+        console.log('--- NAO enviou erro (create)');
+      });
+      return {
+        status: 400,
+        message: 'Falha ao criar flyer'
+      };
+    }
+  }
+
+} // const fileImage = await instance.jsonToImageBase64(json, {
+//   pixelRatio: 0.8,
+//   mimeType: 'image/jpeg',
+// });
+// const base64Data = fileImage.replace(/^data:image\/jpeg;base64,/, '');
+// const timestamps = new Date().toISOString();
+// const json_url = await storage.saveFile({
+//   name: `${offer_id}-${name}-${timestamps}`,
+//   type: 'json',
+//   contentType: 'application/json',
+//   base64: Buffer.from(JSON.stringify(json, undefined, 2)).toString(
+//     'base64',
+//   ),
+// });
+// const image_url = await storage.saveFile({
+//   name: `${offer_id}-${name}-${timestamps}`,
+//   type: 'jpeg',
+//   contentType: 'image/jpeg',
+//   base64: base64Data,
+// });
+// const result = await axios
+//   .post(
+//     'https://vfv7y5gpm8.execute-api.us-east-1.amazonaws.com/dev/',
+//     { name, type, offer_id, json_url, image_url },
+//     {
+//       headers: {
+//         Authorization: access_token,
+//       },
+//     },
+//   )
+//   .then(resp => resp.data);
+
+
+exports.CreateFlyerService = CreateFlyerService;
